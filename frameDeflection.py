@@ -1,103 +1,131 @@
-"""
-Purpose
-    Find the deflection of a frame.
-
-Variable descriptions
-    x and y = global x and y coordinates of each node
-    k = element stiffness matrix
-    kk = system stiffness matrix
-    ff = system force vector
-    index = a vector containing system dofs associated with each element
-    bcdof = a vector containing dofs associated with boundary conditions
-    bcval = a vector containing boundary condition values associated with
-            the dofs in 'bcdof'
-"""
-
 import numpy as np
 from femUtils import *
 
-
-# Problem parameters
-nel = 6            # number of elements
-nnel = 2           # number of nodes per element
-ndof = 3           # number of dofs per node
-nnode = (nnel - 1) * nel + 1  # total number of nodes in system
-sdof = nnode * ndof            # total system dofs
-
-# Node coordinates
-x = np.zeros(nnode)
-y = np.zeros(nnode)
-
-x[0] = 0;   y[0] = 0    # x, y coord. values of node 1 in terms of the global axis
-x[1] = 0;   y[1] = 15   # x, y coord. values of node 2 in terms of the global axis
-x[2] = 0;   y[2] = 30   # x, y coord. values of node 3 in terms of the global axis
-x[3] = 0;   y[3] = 45   # x, y coord. values of node 4 in terms of the global axis
-x[4] = 0;   y[4] = 60   # x, y coord. values of node 5 in terms of the global axis
-x[5] = 10;  y[5] = 60   # x, y coord. values of node 6 in terms of the global axis
-x[6] = 20;  y[6] = 60   # x, y coord. values of node 7 in terms of the global axis
-
-# Material and geometric properties
-el = 30e6          # elastic modulus
-area = 2           # cross-sectional area
-xi = 2/3           # moment of inertia of cross-section
-rho = 1            # mass density per volume (dummy value for static analysis)
-
-# Boundary conditions
-bcdof = np.array([0, 1, 2], dtype=int)  # DOFs at node 1 are constrained (0-indexed)
-bcval = np.array([0, 0, 0])             # constrained values are 0
-
-# Initialize system matrices
-ff = np.zeros(sdof)          # system force vector
-kk = np.zeros((sdof, sdof))  # system stiffness matrix
-
-# Applied load
-ff[19] = -60  # load applied at node 7 in the negative y direction (0-indexed: DOF 20 -> index 19)
-
-# Assembly loop
-for iel in range(nel):  # loop for the total number of elements
+def calculate_frame_deflection(
+        nel:int, nnel:int, ndof:int, x:np.ndarray, y:np.ndarray, 
+        el:float, area:float, xi:float, 
+        bcdof:list, bcval:list, applied_forces:dict):
+    """
+    Purpose:
+        Calculate the deflection of a frame structure using the Finite Element Method.
+        This function performs a finite element analysis on a frame structure to compute
+        nodal displacements under applied loads and boundary conditions. It assembles the
+        global stiffness matrix, applies boundary conditions, and solves the system of
+        linear equations.
     
-    # Extract system dofs associated with element
-    index = feeldof1(iel, nnel, ndof)
-    
-    # Node numbers for element 'iel'
-    node1 = iel      # starting node number for element 'iel'
-    node2 = iel + 1  # ending node number for element 'iel'
-    
-    # Coordinates of nodes
-    x1 = x[node1]
-    y1 = y[node1]
-    x2 = x[node2]
-    y2 = y[node2]
-    
-    # Length of element 'iel'
-    leng = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-    
-    # Compute the angle between the local and global axes
-    if (x2 - x1) == 0:
-        if y2 > y1:
-            beta = np.pi / 2
+    Parameters:
+        nel : int
+            Number of elements in the frame structure.
+        nnel : int
+            Number of nodes per element.
+        ndof : int
+            Number of degrees of freedom per node.
+        x : numpy.ndarray
+            Array containing x-coordinates of all nodes.
+        y : numpy.ndarray
+            Array containing y-coordinates of all nodes.
+        el : float
+            Young's modulus (elastic modulus) of the material.
+        area : float
+            Cross-sectional area of the frame elements.
+        xi : float
+            Moment of inertia of the cross-section.
+        bcdof : list or numpy.ndarray
+            List of degrees of freedom where boundary conditions are applied.
+        bcval : list or numpy.ndarray
+            List of prescribed values for the boundary conditions.
+        applied_forces : dict
+            Dictionary mapping degree of freedom indices (int) to force values (float) 
+            or moments (float).
+            Example: {dof_index: value}
+
+    Returns:
+        store : dict
+            Dictionary mapping degree of freedom indices (int) to computed displacements (float).
+    """
+
+    # Problem parameters
+    nnode = (nnel - 1) * nel + 1  # total number of nodes in system
+    sdof = nnode * ndof            # total system dofs
+
+    # Initialize system matrices
+    ff = np.zeros(sdof)          # system force vector
+    kk = np.zeros((sdof, sdof))  # system stiffness matrix
+
+    # Applied load
+    for(dof, value) in applied_forces.items():
+        ff[dof] = value
+
+    # Assembly loop
+    for iel in range(nel):  # loop for the total number of elements
+
+        # Extract system dofs associated with element
+        index = feeldof1(iel, nnel, ndof)
+
+        # Node numbers for element 'iel'
+        node1 = iel      # starting node number for element 'iel'
+        node2 = iel + 1  # ending node number for element 'iel'
+
+        # Coordinates of nodes
+        x1 = x[node1]
+        y1 = y[node1]
+        x2 = x[node2]
+        y2 = y[node2]
+
+        # Length of element 'iel'
+        leng = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+        # Compute the angle between the local and global axes
+        if (x2 - x1) == 0:
+            if y2 > y1:
+                beta = np.pi / 2
+            else:
+                beta = -np.pi / 2
         else:
-            beta = -np.pi / 2
-    else:
-        beta = np.arctan((y2 - y1) / (x2 - x1))
+            beta = np.arctan((y2 - y1) / (x2 - x1))
+
+        # Compute element stiffness matrix
+        k = feframe2(el, xi, leng, area, beta)
+
+        # Assemble element matrix into system matrix
+        kk = feasmbl1(kk, k, index)
+
+    # Apply boundary conditions
+    kk, ff = feaplyc2(kk, ff, bcdof, bcval)
+
+    # Solve the matrix equation
+    fsol = np.linalg.solve(kk, ff)
+
+    tolerance = 1e-10
+    fsol[np.abs(fsol) < tolerance] = 0.0
+
+    # Print results
+    num = np.arange(0, sdof)
+    store = {dof: displacement for dof, displacement in zip(num, fsol)}
+
+    return store
+
+def equivalent_nodal_loads(q, L):
+    """
+    Purpose:
+        Calculate equivalent nodal loads for a uniformly distributed load on a frame element.
+    Parameters:
+        q : float
+            Magnitude of the uniformly distributed load (force per unit length).
+        L : float
+            Length of the frame element.
+    Returns:
+        f_local : numpy.ndarray
+            Equivalent nodal load vector in the local coordinate system.
+    """
     
-    # Compute element stiffness matrix
-    k, m = feframe2(el, xi, leng, area, rho, beta, 1)
-    
-    # Assemble element matrix into system matrix
-    kk = feasmbl1(kk, k, index)
+    f_local = np.array([
+        0.0,
+        q * L / 2,
+        q * L**2 / 12,
+        0.0,
+        q * L / 2,
+        -q * L**2 / 12
+    ])
 
-# Apply boundary conditions
-kk, ff = feaplyc2(kk, ff, bcdof, bcval)
-
-# Solve the matrix equation
-fsol = np.linalg.solve(kk, ff)
-
-# Print results
-num = np.arange(1, sdof + 1)
-store = np.column_stack((num, fsol))
-
-print("DOF    Displacement")
-print("---    ------------")
-for i in range(len(store)):
-    print(f"{store[i, 0]:3.0f}    {store[i, 1]:12.6e}")
+    return f_local
