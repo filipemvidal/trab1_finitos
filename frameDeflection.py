@@ -57,7 +57,7 @@ def calculate_frame_deflection(
         ff[dof] = value
 
     # Assembly loop
-    for iel in range(nel):  # loop for the total number of elements
+    for iel in range(0, nel):  # loop for the total number of elements
 
         # Extract system dofs associated with element
         index = feeldof1(iel, nnel, ndof)
@@ -93,11 +93,19 @@ def calculate_frame_deflection(
     # Apply boundary conditions
     kk, ff = feaplyc2(kk, ff, bcdof, bcval)
 
+    # print the kk matrix
+    #np.set_printoptions(precision=3, suppress=True)
+    # print("\nGlobal Stiffness Matrix (KK):")
+    # print(kk)
+
+    # print("\nGlobal Force Vector (FF):")
+    # print(ff)
+
     # Solve the matrix equation
     fsol = np.linalg.solve(kk, ff)
 
-    tolerance = 1e-10
-    fsol[np.abs(fsol) < tolerance] = 0.0
+    # tolerance = 1e-10
+    # fsol[np.abs(fsol) < tolerance] = 0.0
 
     # Print results
     num = np.arange(0, sdof)
@@ -105,7 +113,7 @@ def calculate_frame_deflection(
 
     return store
 
-def equivalent_nodal_loads(q, L):
+def equivalent_nodal_loads(q, L, horizontal=False):
     """
     Purpose:
         Calculate equivalent nodal loads for a uniformly distributed load on a frame element.
@@ -118,14 +126,20 @@ def equivalent_nodal_loads(q, L):
         f_local : numpy.ndarray
             Equivalent nodal load vector in the local coordinate system.
     """
+    if horizontal:
+        Qx = q * L / 2
+        Qy = 0.0
+    else:
+        Qx = 0.0
+        Qy = q * L / 2
     
     f_local = np.array([
-        0.0,
-        q * L / 2,
-        q * L**2 / 12,
-        0.0,
-        q * L / 2,
-        -q * L**2 / 12
+        Qx,
+        Qy,
+        -abs(q) * L / 12,
+        Qx,
+        Qy,
+        abs(q) * L / 12
     ])
 
     return f_local
