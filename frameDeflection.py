@@ -122,11 +122,11 @@ def equivalent_nodal_loads(q, L, beta=0.0):
             Magnitude of the uniformly distributed load (force per unit length).
         L : float
             Length of the frame element.
-        horizontal : bool, optional
-            If True, the load is applied horizontally; if False, vertically. Default is False.
+        beta : float, optional
+            Angle between the local and global axes in degrees. Default is 0.0.
     Returns:
-        f_local : numpy.ndarray
-            Equivalent nodal load vector in the local coordinate system.
+        f_global : numpy.ndarray
+            Equivalent nodal load vector in the global coordinate system.
     """
 
     # Convert angle to radians
@@ -150,99 +150,3 @@ def equivalent_nodal_loads(q, L, beta=0.0):
     f_global = r @ f_local
 
     return f_global
-
-def interpolate_displacement(
-    store: dict,
-    x: np.ndarray,
-    y: np.ndarray,
-    nel: int,
-    nnel: int,
-    ndof: int,
-    x_point: float,
-    y_point: float,
-):
-    """
-    Purpose:
-        Calculate the displacement at a specific point in the frame structure.
-        The point can be at a node or within an element. Uses shape functions
-        for interpolation within elements.
-    Parameters:
-        store : dict
-            Dictionary mapping degree of freedom indices to computed displacements.
-        x : numpy.ndarray
-            Array containing x-coordinates of all nodes.
-        y : numpy.ndarray
-            Array containing y-coordinates of all nodes.
-        nel : int
-            Number of elements in the frame structure.
-        nnel : int
-            Number of nodes per element.
-        ndof : int
-            Number of degrees of freedom per node.
-        x_point : float
-            X-coordinate of the point where displacement is required.
-        y_point : float
-            Y-coordinate of the point where displacement is required.
-    Returns:
-        displacement : dict
-            Dictionary with keys 'u' (horizontal displacement), 'v' (vertical displacement),
-            and 'theta' (rotation) at the specified point.
-    """
-    tolerance = 1e-6
-
-    # Check if point is at a node
-    for node_idx in range(len(x)):
-        if abs(x[node_idx] - x_point) < tolerance and abs(y[node_idx] - y_point) < tolerance:
-            u = store[node_idx * ndof]
-            v = store[node_idx * ndof + 1]
-            theta = store[node_idx * ndof + 2]
-            return {'u': u, 'v': v, 'theta': theta}
-
-    # Check if point is within an element
-    for iel in range(nel):
-        node1 = iel
-        node2 = iel + 1
-
-        x1, y1 = x[node1], y[node1]
-        x2, y2 = x[node2], y[node2]
-
-        # Length of element
-        L = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-
-        # Distance from node1 to the point
-        d = np.sqrt((x_point - x1)**2 + (y_point - y1)**2)
-
-        # Check if point is on the element (collinear and within bounds)
-        if L > tolerance:
-            # Check collinearity using cross product
-            cross = abs((x_point - x1) * (y2 - y1) - (y_point - y1) * (x2 - x1))
-            if cross < tolerance and d < L + tolerance:
-                # Normalized position along element (0 to 1)
-                xi = d / L
-
-                # Get nodal displacements
-                u1 = store[node1 * ndof]
-                v1 = store[node1 * ndof + 1]
-                theta1 = store[node1 * ndof + 2]
-                u2 = store[node2 * ndof]
-                v2 = store[node2 * ndof + 1]
-                theta2 = store[node2 * ndof + 2]
-
-                # Linear shape functions for axial displacement
-                N1 = 1 - xi
-                N2 = xi
-
-                # Hermite shape functions for transverse displacement
-                H1 = 1 - 3*xi**2 + 2*xi**3
-                H2 = xi - 2*xi**2 + xi**3
-                H3 = 3*xi**2 - 2*xi**3
-                H4 = -xi**2 + xi**3
-
-                # Interpolate displacements in global coordinate system
-                u_global = N1 * u1 + N2 * u2
-                v_global = H1 * v1 + H2 * L * theta1 + H3 * v2 + H4 * L * theta2
-                theta_global = N1 * theta1 + N2 * theta2
-
-                return {'u': u_global, 'v': v_global, 'theta': theta_global}
-
-    raise ValueError(f"Point ({x_point}, {y_point}) is not on the structure.")
