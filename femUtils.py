@@ -95,7 +95,7 @@ def assembly(kk, k, index):
     
     return kk
 
-def applyCon(kk, ff, bcdof, bcval):
+def applyCond(kk, ff, bcdof, bcval):
     """
     Purpose:
         Apply constraints to matrix equation [kk]{x}={ff}
