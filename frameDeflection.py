@@ -60,7 +60,7 @@ def calculate_frame_deflection(
     for iel in range(0, nel):  # loop for the total number of elements
 
         # Extract system dofs associated with element
-        index = feeldof1(iel, nnel, ndof)
+        index = eldof(iel, nnel, ndof)
 
         # Node numbers for element 'iel'
         node1 = iel      # starting node number for element 'iel'
@@ -85,13 +85,13 @@ def calculate_frame_deflection(
             beta = np.arctan((y2 - y1) / (x2 - x1))
 
         # Compute element stiffness matrix
-        k = feframe2(el, xi, leng, area, beta)
+        k = stiffMat(el, xi, leng, area, beta)
 
         # Assemble element matrix into system matrix
-        kk = feasmbl1(kk, k, index)
+        kk = assembly(kk, k, index)
 
     # Apply boundary conditions
-    kk, ff = feaplyc2(kk, ff, bcdof, bcval)
+    kk, ff = applyCon(kk, ff, bcdof, bcval)
 
     # print the kk matrix
     #np.set_printoptions(precision=3, suppress=True)
@@ -113,7 +113,7 @@ def calculate_frame_deflection(
 
     return store
 
-def equivalent_nodal_loads(q, L, horizontal=False):
+def equivalent_nodal_loads(q, L, beta=0.0):
     """
     Purpose:
         Calculate equivalent nodal loads for a uniformly distributed load on a frame element.
@@ -122,24 +122,50 @@ def equivalent_nodal_loads(q, L, horizontal=False):
             Magnitude of the uniformly distributed load (force per unit length).
         L : float
             Length of the frame element.
+        horizontal : bool, optional
+            If True, the load is applied horizontally; if False, vertically. Default is False.
     Returns:
         f_local : numpy.ndarray
             Equivalent nodal load vector in the local coordinate system.
     """
-    if horizontal:
-        Qx = q * L / 2
-        Qy = 0.0
-    else:
-        Qx = 0.0
-        Qy = q * L / 2
+    # if horizontal:
+    #     Qx = q * L / 2
+    #     Qy = 0.0
+    # else:
+    #     Qx = 0.0
+    #     Qy = q * L / 2
     
-    f_local = np.array([
-        Qx,
-        Qy,
-        -abs(q) * L / 12,
-        Qx,
-        Qy,
-        abs(q) * L / 12
+    # f_local = np.array([
+    #     Qx,
+    #     Qy,
+    #     -abs(q) * L / 12,
+    #     Qx,
+    #     Qy,
+    #     abs(q) * L / 12
+    # ])
+
+    beta = np.radians(beta)
+
+    # Rotation matrix
+    r = np.array([
+        [np.cos(beta),  np.sin(beta),  0,   0,              0,             0],
+        [-np.sin(beta), np.cos(beta),  0,   0,              0,             0],
+        [0,             0,             1,   0,              0,             0],
+        [0,             0,             0,   np.cos(beta),   np.sin(beta),  0],
+        [0,             0,             0,  -np.sin(beta),   np.cos(beta),  0],
+        [0,             0,             0,   0,              0,             1]
     ])
 
-    return f_local
+    f_local = np.array([
+        0.0,
+        q* L / 2,
+        -q * L / 12,
+        0.0,
+        q* L / 2,
+        q * L / 12
+    ])
+    
+    # Equivalent nodal load vector in the global coordinate system.
+    f_global = r @ f_local
+
+    return f_global

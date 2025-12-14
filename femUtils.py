@@ -1,6 +1,6 @@
 import numpy as np
 
-def feeldof1(iel, nnel, ndof):
+def eldof(iel, nnel, ndof):
     """
     Purpose:
         Compute system dofs associated with each element in one-
@@ -25,32 +25,26 @@ def feeldof1(iel, nnel, ndof):
     
     return index
 
-def feframe2(el, xi, leng, area, beta):
+def stiffMat(el, xi, leng, area, beta):
     """
     Purpose:
-        Stiffness and mass matrices for the 2-d frame element
+        Stiffness matrix for the 2-d frame element
         nodal dof {u_1 v_1 theta_1 u_2 v_2 theta_2}
 
     Synopsis:
-        k, m = feframe2(el, xi, leng, area, rho, beta, ipt) 
+        k = feframe2(el, xi, leng, area, rho, beta, ipt) 
 
     Variable Description:
         k - element stiffness matrix (size of 6x6)   
-        m - element mass matrix (size of 6x6)
         el - elastic modulus 
         xi - second moment of inertia of cross-section
         leng - element length
         area - area of beam cross-section
-        rho - mass density (mass per unit volume)
         beta - angle between the local and global axes
                is positive if the local axis is in the ccw direction from
                the global axis
-        ipt = 1 - consistent mass matrix
-            = 2 - lumped mass matrix
-            = 3 - diagonal mass matrix
     """
     
-    # Stiffness matrix at the local axis
     a = el * area / leng
     c = el * xi / (leng ** 3)
     
@@ -78,7 +72,7 @@ def feframe2(el, xi, leng, area, beta):
     
     return k
 
-def feasmbl1(kk, k, index):
+def assembly(kk, k, index):
     """
     Purpose:
         Assembly of element matrices into the system matrix
@@ -101,7 +95,7 @@ def feasmbl1(kk, k, index):
     
     return kk
 
-def feaplyc2(kk, ff, bcdof, bcval):
+def applyCon(kk, ff, bcdof, bcval):
     """
     Purpose:
         Apply constraints to matrix equation [kk]{x}={ff}
